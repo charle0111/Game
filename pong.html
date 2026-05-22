@@ -153,10 +153,58 @@
             border: 3px solid rgba(255, 255, 255, 0.1);
             transition: border-color 0.3s;
             cursor: none; /* 隱藏滑鼠指針，讓擋板跟隨更自然 */
+            max-width: 100%;
+            height: auto;
         }
 
         #gameCanvas:focus {
             border-color: var(--neon-glow);
+        }
+
+        /* 虛擬控制鍵容器 */
+        .virtual-dpad {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            width: 100%;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* 虛擬按鍵樣式 */
+        .dpad-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 25px;
+            min-width: 110px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 240, 255, 0.3);
+            border-radius: 30px;
+            color: var(--neon-glow);
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 0 8px rgba(0, 240, 255, 0.1);
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .dpad-btn span {
+            font-size: 0.95rem;
+            letter-spacing: 1px;
+        }
+
+        /* 按鍵被按下時的霓虹發光與縮放效果 */
+        .dpad-btn:active {
+            transform: scale(0.92);
+            background: rgba(0, 240, 255, 0.15);
+            border-color: var(--neon-glow);
+            box-shadow: 0 0 15px var(--neon-glow);
+            color: #fff;
         }
 
         /* 控制區域 */
@@ -259,14 +307,30 @@
 
         <div style="position: relative;">
             <!-- 覆蓋提示畫面 -->
-            <div id="gameOverlay" class="overlay" style="width: 480px; height: 360px; display: flex;">
+            <div id="gameOverlay" class="overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex;">
                 <h2 id="overlayTitle">BRICK BREAKER</h2>
-                <p id="overlaySub">移動滑鼠或左右方向鍵控制擋板<br>擊碎所有磚塊吧！</p>
+                <p id="overlaySub">移動滑鼠、觸控拖曳或左右方向鍵控制擋板<br>擊碎所有磚塊吧！</p>
                 <button class="btn" onclick="startGame()">START GAME</button>
             </div>
             
             <!-- 💡 【畫布大小】寬 480 像素，高 360 像素 -->
             <canvas id="gameCanvas" width="480" height="360" tabindex="0"></canvas>
+        </div>
+
+        <!-- 虛擬控制按鈕 (左右方向鍵) -->
+        <div id="virtualDpad" class="virtual-dpad">
+            <button class="dpad-btn" id="dpadLeftBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                <span>左移</span>
+            </button>
+            <button class="dpad-btn" id="dpadRightBtn">
+                <span>右移</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </button>
         </div>
 
         <div class="controls">
@@ -344,12 +408,16 @@
         let isPaused = false;
         let animationId = null;
 
-        // 監聽鍵盤與滑鼠事件
+        // 監聽鍵盤與滑鼠/觸控事件
         let rightPressed = false;
         let leftPressed = false;
         document.addEventListener("keydown", keyDownHandler);
         document.addEventListener("keyup", keyUpHandler);
         document.addEventListener("mousemove", mouseMoveHandler);
+        
+        // 行動端觸控事件監聽
+        canvas.addEventListener("touchstart", touchStartHandler, { passive: false });
+        canvas.addEventListener("touchmove", touchMoveHandler, { passive: false });
 
         // 格式化分數顯示（補零，例如 005）
         function formatNumber(num) {
@@ -377,17 +445,55 @@
             }
         }
 
-        // 滑鼠移動控制擋板
+        // 滑鼠移動控制擋板 (包含自適應比例映射修正)
         function mouseMoveHandler(e) {
             const rect = canvas.getBoundingClientRect();
-            // 計算滑鼠在畫布內相對的 X 座標
-            const relativeX = e.clientX - rect.left;
+            // 計算滑鼠在畫布內相對的 X 座標，乘以 canvas.width / rect.width 修正自適應縮放後的座標偏差
+            const relativeX = (e.clientX - rect.left) * (canvas.width / rect.width);
             if (relativeX > 0 && relativeX < canvas.width) {
                 // 將擋板中心對準滑鼠 X 座標
                 paddleX = relativeX - paddleWidth / 2;
                 // 限制擋板不移出邊界
                 if (paddleX < 0) paddleX = 0;
                 if (paddleX > canvas.width - paddleWidth) paddleX = canvas.width - paddleWidth;
+            }
+        }
+
+        // 觸控開始事件
+        function touchStartHandler(e) {
+            if (!gameRunning || isPaused) return;
+            e.preventDefault(); // 阻止瀏覽器預設滾動行為
+            handleTouch(e);
+        }
+
+        // 觸控移動事件
+        function touchMoveHandler(e) {
+            if (!gameRunning || isPaused) return;
+            e.preventDefault(); // 阻止瀏覽器預設滾動行為
+            handleTouch(e);
+        }
+
+        // 處理觸控輸入，完美對準擋板中心
+        function handleTouch(e) {
+            if (e.touches && e.touches[0]) {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                // 映射觸控點屏幕座標到畫布內部座標，並乘以縮放係數
+                const relativeX = (touch.clientX - rect.left) * (canvas.width / rect.width);
+                
+                paddleX = relativeX - paddleWidth / 2;
+                
+                // 限制擋板不移出邊界
+                if (paddleX < 0) paddleX = 0;
+                if (paddleX > canvas.width - paddleWidth) paddleX = canvas.width - paddleWidth;
+            }
+        }
+
+        // 行動端偵測：若支援觸控，更新玩法說明文字
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            const instructionsEl = document.querySelector(".instructions");
+            if (instructionsEl) {
+                instructionsEl.innerHTML = "觸控並 <b>左右拖曳畫布</b> 移動擋板<br>點擊下方按鈕或返回大廳操作";
             }
         }
 
@@ -716,6 +822,40 @@
             } catch (e) {
                 // 不支援音效時默默忽略
             }
+        }
+
+        // 綁定虛擬按鈕事件 (支援滑動/長按)
+        const dpadLeft = document.getElementById("dpadLeftBtn");
+        const dpadRight = document.getElementById("dpadRightBtn");
+
+        if (dpadLeft && dpadRight) {
+            // 向左按鈕
+            dpadLeft.addEventListener("mousedown", () => {
+                leftPressed = true;
+                playAudio(300, 'sine', 0.04);
+            });
+            dpadLeft.addEventListener("touchstart", (e) => {
+                e.preventDefault(); // 避免點擊延遲
+                leftPressed = true;
+                playAudio(300, 'sine', 0.04);
+            });
+            dpadLeft.addEventListener("mouseup", () => leftPressed = false);
+            dpadLeft.addEventListener("mouseleave", () => leftPressed = false);
+            dpadLeft.addEventListener("touchend", () => leftPressed = false);
+
+            // 向右按鈕
+            dpadRight.addEventListener("mousedown", () => {
+                rightPressed = true;
+                playAudio(300, 'sine', 0.04);
+            });
+            dpadRight.addEventListener("touchstart", (e) => {
+                e.preventDefault(); // 避免點擊延遲
+                rightPressed = true;
+                playAudio(300, 'sine', 0.04);
+            });
+            dpadRight.addEventListener("mouseup", () => rightPressed = false);
+            dpadRight.addEventListener("mouseleave", () => rightPressed = false);
+            dpadRight.addEventListener("touchend", () => rightPressed = false);
         }
     </script>
 </body>
