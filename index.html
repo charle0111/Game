@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>極簡霓虹遊戲大廳 Neon Cyber Arcade</title>
+    <style>
+        :root {
+            --bg-color: #08090f;        /* 遊戲大廳的深邃底色 */
+            --card-bg: rgba(18, 20, 32, 0.85); /* 半透明玻璃面板背景 */
+            --text-color: #ffffff;      /* 主要文字顏色 */
+            --text-muted: #8392a6;      /* 次要文字顏色 */
+            
+            /* 霓虹發光配色 */
+            --neon-blue: #00f0ff;       /* 彈磚塊主題藍 */
+            --neon-green: #00ff88;      /* 貪食蛇主題綠 */
+            --neon-pink: #ff0055;       /* 大廳標題亮粉色 */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            /* 背景星光與氣泡霓虹陰影 */
+            background-image: 
+                radial-gradient(circle at 15% 20%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 80%, rgba(255, 0, 85, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(0, 255, 136, 0.04) 0%, transparent 60%);
+        }
+
+        .lobby-container {
+            max-width: 900px;
+            width: 90%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+            padding: 40px 20px;
+        }
+
+        /* 大廳閃爍霓虹標題 */
+        .lobby-header {
+            text-align: center;
+        }
+
+        .lobby-title {
+            font-size: 3rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, var(--neon-pink), var(--neon-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 2px 10px rgba(0, 240, 255, 0.3));
+            animation: titleGlow 2.5s ease-in-out infinite alternate;
+        }
+
+        .lobby-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* 遊戲選擇網格 */
+        .game-grid {
+            display: flex;
+            gap: 30px;
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* 遊戲選擇卡片 */
+        .game-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            width: 380px;
+            padding: 35px 25px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(15px);
+        }
+
+        /* 貪食蛇卡片邊框與陰影（綠色） */
+        .card-snake {
+            border: 2px solid rgba(0, 255, 136, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 0 15px rgba(0, 255, 136, 0.02);
+        }
+
+        .card-snake:hover {
+            border-color: var(--neon-green);
+            box-shadow: 0 15px 35px rgba(0, 255, 136, 0.25), inset 0 0 20px rgba(0, 255, 136, 0.05);
+            transform: translateY(-8px);
+        }
+
+        /* 彈磚塊卡片邊框與陰影（藍色） */
+        .card-breaker {
+            border: 2px solid rgba(0, 240, 255, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 0 15px rgba(0, 240, 255, 0.02);
+        }
+
+        .card-breaker:hover {
+            border-color: var(--neon-blue);
+            box-shadow: 0 15px 35px rgba(0, 240, 255, 0.25), inset 0 0 20px rgba(0, 240, 255, 0.05);
+            transform: translateY(-8px);
+        }
+
+        /* 裝飾性背景霓虹光暈 */
+        .card-glow {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            filter: blur(50px);
+            opacity: 0.15;
+            top: -50px;
+            z-index: 0;
+            transition: opacity 0.3s;
+        }
+
+        .card-snake .card-glow {
+            background-color: var(--neon-green);
+            left: -50px;
+        }
+
+        .card-breaker .card-glow {
+            background-color: var(--neon-blue);
+            right: -50px;
+        }
+
+        .game-card:hover .card-glow {
+            opacity: 0.3;
+        }
+
+        /* 遊戲圖示 SVG 樣式 */
+        .game-icon-container {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.03);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            position: relative;
+            z-index: 1;
+            transition: transform 0.3s ease;
+        }
+
+        .game-card:hover .game-icon-container {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .card-snake .game-icon-container {
+            color: var(--neon-green);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.1);
+        }
+
+        .card-snake:hover .game-icon-container {
+            box-shadow: 0 0 25px rgba(0, 255, 136, 0.3);
+            background: rgba(0, 255, 136, 0.05);
+        }
+
+        .card-breaker .game-icon-container {
+            color: var(--neon-blue);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+        }
+
+        .card-breaker:hover .game-icon-container {
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.3);
+            background: rgba(0, 240, 255, 0.05);
+        }
+
+        /* 遊戲標題與描述 */
+        .game-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+            z-index: 1;
+        }
+
+        .card-snake .game-title {
+            text-shadow: 0 0 8px rgba(0, 255, 136, 0.2);
+        }
+
+        .card-breaker .game-title {
+            text-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
+        }
+
+        .game-description {
+            font-size: 0.92rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 30px;
+            z-index: 1;
+            padding: 0 10px;
+        }
+
+        /* 開始按鈕樣式 */
+        .card-btn {
+            padding: 10px 30px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            border-radius: 50px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            border: none;
+            cursor: pointer;
+            z-index: 1;
+            transition: all 0.25s ease;
+        }
+
+        .card-snake .card-btn {
+            background: linear-gradient(135deg, var(--neon-green), #00b358);
+            color: #05060a;
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+        }
+
+        .card-snake:hover .card-btn {
+            box-shadow: 0 6px 22px rgba(0, 255, 136, 0.5);
+            transform: scale(1.05);
+        }
+
+        .card-breaker .card-btn {
+            background: linear-gradient(135deg, var(--neon-blue), #0099ff);
+            color: #05060a;
+            box-shadow: 0 4px 15px rgba(0, 240, 255, 0.3);
+        }
+
+        .card-breaker:hover .card-btn {
+            box-shadow: 0 6px 22px rgba(0, 240, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        /* 大廳底部版權/說明 */
+        .lobby-footer {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.2);
+            text-align: center;
+            margin-top: 10px;
+            letter-spacing: 1px;
+        }
+
+        /* 動畫 */
+        @keyframes titleGlow {
+            0% {
+                text-shadow: 0 0 15px rgba(255, 0, 85, 0.3), 0 0 30px rgba(0, 240, 255, 0.2);
+            }
+            100% {
+                text-shadow: 0 0 25px rgba(255, 0, 85, 0.6), 0 0 45px rgba(0, 240, 255, 0.5);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="lobby-container">
+        
+        <div class="lobby-header">
+            <h1 class="lobby-title">Neon Arcade</h1>
+            <p class="lobby-subtitle">SELECT YOUR GAME / 請選擇遊戲</p>
+        </div>
+
+        <div class="game-grid">
+            
+            <!-- 貪食蛇遊戲卡片 -->
+            <a href="snake.html" class="game-card card-snake" onclick="playClickSound(event, 'snake.html')">
+                <div class="card-glow"></div>
+                <div class="game-icon-container">
+                    <!-- 貪食蛇圖示 SVG -->
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M8.3 10a3.5 3.5 0 0 1 5.1 0l3.4 3.4a3.5 3.5 0 0 0 5.1 0"></path>
+                        <path d="M12 3a9 9 0 0 0-9 9c0 3.3 2.7 6 6 6h4"></path>
+                        <circle cx="19" cy="9" r="1" fill="currentColor"></circle>
+                    </svg>
+                </div>
+                <h2 class="game-title">Neon Snake</h2>
+                <p class="game-description">
+                    經典極簡貪食蛇！操控發光小蛇在霓虹網格上吞噬能量球，挑戰無限延長。支援鍵盤與 WASD 方向操控。
+                </p>
+                <button class="card-btn">進入遊戲</button>
+            </a>
+
+            <!-- 彈磚塊遊戲卡片 -->
+            <a href="pong.html" class="game-card card-breaker" onclick="playClickSound(event, 'pong.html')">
+                <div class="card-glow"></div>
+                <div class="game-icon-container">
+                    <!-- 彈磚塊圖示 SVG -->
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="6" height="4" rx="1"></rect>
+                        <rect x="9" y="3" width="6" height="4" rx="1"></rect>
+                        <rect x="16" y="3" width="6" height="4" rx="1"></rect>
+                        <rect x="5" y="9" width="6" height="4" rx="1"></rect>
+                        <rect x="13" y="9" width="6" height="4" rx="1"></rect>
+                        <circle cx="9" cy="18" r="2" fill="currentColor"></circle>
+                        <line x1="6" y1="21" x2="16" y2="21" stroke-width="3"></line>
+                    </svg>
+                </div>
+                <h2 class="game-title">Neon Breaker</h2>
+                <p class="game-description">
+                    刺激彈磚塊！滑動極速發光擋板反彈能量球，擊碎多彩霓虹磚塊。支援滑動滑鼠或方向鍵操控。
+                </p>
+                <button class="card-btn">進入遊戲</button>
+            </a>
+
+        </div>
+
+        <div class="lobby-footer">
+            © 2026 Retro Cyber Arcade. Powered by Web Canvas API & Built-in Synthesizer.
+        </div>
+        
+    </div>
+
+    <script>
+        // 💡 頁面載入時自動播放一段復古 8-bit 電子開機問候旋律
+        window.addEventListener('click', playIntroMusic, { once: true });
+        window.addEventListener('keydown', playIntroMusic, { once: true });
+        
+        let introPlayed = false;
+        function playIntroMusic() {
+            if (introPlayed) return;
+            introPlayed = true;
+            
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // 播放大廳啟動琶音 (C Major 9)
+                const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 987.77]; // C4, E4, G4, C5, E5, B5
+                notes.forEach((freq, index) => {
+                    setTimeout(() => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                        
+                        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+                        
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        
+                        osc.start();
+                        osc.stop(audioCtx.currentTime + 0.4);
+                    }, index * 80);
+                });
+            } catch (e) {
+                // 忽略不支援 Audio 的瀏覽器
+            }
+        }
+
+        // 💡 點擊遊戲時，播放清脆的「投幣/確認」音效後進行頁面跳轉
+        function playClickSound(event, url) {
+            event.preventDefault(); // 阻止立即跳轉，等聲音播放完畢
+            
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // 投幣音效：快速連彈兩個高音
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc1.type = 'sine';
+                osc2.type = 'sine';
+                
+                osc1.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+                osc2.frequency.setValueAtTime(880.00, audioCtx.currentTime + 0.08); // A5
+                
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+                
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc1.start();
+                osc1.stop(audioCtx.currentTime + 0.35);
+                osc2.start(audioCtx.currentTime + 0.08);
+                osc2.stop(audioCtx.currentTime + 0.35);
+            } catch (e) {
+                // 忽略錯誤直接跳轉
+            }
+
+            // 延遲 250 毫秒跳轉，讓音效播放完整
+            setTimeout(() => {
+                window.location.href = url;
+            }, 250);
+        }
+
+        // 為所有卡片添加懸停聲效
+        const cards = document.querySelectorAll('.game-card');
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                    
+                    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+                    
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.05);
+                } catch (e) {}
+            });
+        });
+    </script>
+</body>
+</html>
