@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>極簡霓虹彈磚塊 Retro Neon Brick Breaker</title>
+    <style>
+        /* 
+           💡 【控制顏色 - CSS 部分】
+           這裡使用 CSS 變數定義了整個遊戲的配色。
+           您可以直接修改底下的十六進位顏色代碼，就能輕鬆改變遊戲的主題色彩！
+        */
+        :root {
+            --bg-color: #08090f;        /* 遊戲網頁的深黑色背景 */
+            --card-bg: rgba(16, 17, 28, 0.9); /* 遊戲面板的半透明玻璃效果背景 */
+            --neon-glow: #00f0ff;       /* 主題霓虹藍色（邊框與發光效果） */
+            --ball-color: #ffffff;      /* 彈力球的白色（自帶霓虹藍光） */
+            --paddle-color: #00ff88;    /* 擋板的亮綠色 */
+            --text-color: #ffffff;      /* 主要文字顏色 */
+            --text-muted: #7e8c9f;      /* 次要文字顏色 */
+            
+            /* 磚塊各排的霓虹色彩 */
+            --brick-red: #ff0055;
+            --brick-orange: #ff9900;
+            --brick-yellow: #ffea00;
+            --brick-green: #00ff88;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(255, 0, 85, 0.08) 0%, transparent 40%);
+        }
+
+        /* 遊戲主面板容器 */
+        .game-container {
+            background: var(--card-bg);
+            border: 2px solid var(--neon-glow);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.3), inset 0 0 15px rgba(0, 240, 255, 0.1);
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 95vw;
+        }
+
+        /* 回首頁按鈕樣式 */
+        .back-to-lobby {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-color);
+            padding: 8px 18px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 100;
+        }
+
+        .back-to-lobby:hover {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: var(--neon-glow);
+            color: var(--neon-glow);
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+            transform: translateX(-2px);
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 12px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.6), 0 0 20px rgba(0, 240, 255, 0.3);
+        }
+
+        /* 資訊看板 */
+        .scoreboard {
+            display: flex;
+            gap: 25px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        /* 💡 【分數與生命控制 - CSS 樣式】 */
+        .info-box {
+            background: rgba(255, 255, 255, 0.04);
+            padding: 8px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            min-width: 80px;
+        }
+
+        .info-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .info-val {
+            font-size: 1.5rem;
+            font-family: monospace;
+            color: var(--neon-glow);
+            text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
+        }
+
+        /* 專門渲染心形生命的顏色 */
+        #lives.info-val {
+            color: var(--brick-red);
+            text-shadow: 0 0 5px rgba(255, 0, 85, 0.5);
+        }
+
+        /* 遊戲畫布 Canvas */
+        #gameCanvas {
+            background-color: #05060a;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            outline: none;
+            /* 💡 【控制顏色】畫布的邊框 */
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            transition: border-color 0.3s;
+            cursor: none; /* 隱藏滑鼠指針，讓擋板跟隨更自然 */
+        }
+
+        #gameCanvas:focus {
+            border-color: var(--neon-glow);
+        }
+
+        /* 控制區域 */
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--neon-glow), #00a2ff);
+            color: #000;
+            border: none;
+            padding: 10px 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 240, 255, 0.3);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0, 240, 255, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .instructions {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        /* 覆蓋提示畫面 */
+        .overlay {
+            position: absolute;
+            background: rgba(8, 9, 15, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 12px;
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay h2 {
+            font-size: 2rem;
+            color: var(--neon-glow);
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+            margin-bottom: 12px;
+        }
+
+        .overlay p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+            text-align: center;
+            padding: 0 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 返回大廳按鈕 -->
+    <a href="index.html" class="back-to-lobby">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        返回遊戲大廳
+    </a>
+
+    <div class="game-container">
+        <h1>Neon Breaker</h1>
+        
+        <div class="scoreboard">
+            <!-- 💡 【分數控制 - HTML 顯示】 -->
+            <div class="info-box">
+                <span class="info-label">Score</span>
+                <span id="score" class="info-val">000</span>
+            </div>
+            <div class="info-box">
+                <span class="info-label">Level</span>
+                <span id="level" class="info-val">01</span>
+            </div>
+            <div class="info-box">
+                <span class="info-label">Lives</span>
+                <!-- 用心形符號顯示生命值 -->
+                <span id="lives" class="info-val">♥♥♥</span>
+            </div>
+        </div>
+
+        <div style="position: relative;">
+            <!-- 覆蓋提示畫面 -->
+            <div id="gameOverlay" class="overlay" style="width: 480px; height: 360px; display: flex;">
+                <h2 id="overlayTitle">BRICK BREAKER</h2>
+                <p id="overlaySub">移動滑鼠或左右方向鍵控制擋板<br>擊碎所有磚塊吧！</p>
+                <button class="btn" onclick="startGame()">START GAME</button>
+            </div>
+            
+            <!-- 💡 【畫布大小】寬 480 像素，高 360 像素 -->
+            <canvas id="gameCanvas" width="480" height="360" tabindex="0"></canvas>
+        </div>
+
+        <div class="controls">
+            <button id="actionBtn" class="btn" onclick="startGame()">開始遊戲</button>
+            <div class="instructions">
+                左右移動 <b>滑鼠</b> 或使用鍵盤 <b>← → / A D</b> 移動擋板<br>
+                按 <b>空白鍵 (Space)</b> 暫停遊戲
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreEl = document.getElementById("score");
+        const levelEl = document.getElementById("level");
+        const livesEl = document.getElementById("lives");
+        const overlay = document.getElementById("gameOverlay");
+        const overlayTitle = document.getElementById("overlayTitle");
+        const overlaySub = document.getElementById("overlaySub");
+        const actionBtn = document.getElementById("actionBtn");
+
+        // 💡 【控制顏色 - JavaScript 顏色取值】
+        // 直接從 CSS 變數中讀取發光主題色，用來繪製遊戲物件
+        const colors = {
+            ball: getComputedStyle(document.documentElement).getPropertyValue('--ball-color').trim(),
+            ballGlow: getComputedStyle(document.documentElement).getPropertyValue('--neon-glow').trim(),
+            paddle: getComputedStyle(document.documentElement).getPropertyValue('--paddle-color').trim(),
+            bricks: [
+                getComputedStyle(document.documentElement).getPropertyValue('--brick-red').trim(),
+                getComputedStyle(document.documentElement).getPropertyValue('--brick-orange').trim(),
+                getComputedStyle(document.documentElement).getPropertyValue('--brick-yellow').trim(),
+                getComputedStyle(document.documentElement).getPropertyValue('--brick-green').trim()
+            ]
+        };
+
+        // 擋板參數定義
+        const paddleHeight = 12;
+        const paddleWidth = 80;
+        let paddleX = (canvas.width - paddleWidth) / 2;
+        
+        // 💡 【控制速度 - 擋板移動速度】
+        // 當使用鍵盤左右鍵時，擋板每一次移動的像素距離。
+        const paddleSpeed = 8;
+
+        // 彈力球參數定義
+        const ballRadius = 6;
+        let ballX = canvas.width / 2;
+        let ballY = canvas.height - 30;
+
+        // 💡 【控制速度 - 彈力球移動速度】
+        // dx, dy 代表彈力球在 X 軸與 Y 軸上每影格移動的像素。
+        // 修改這些初始值可以控制彈力球前進的快慢與入射角度！
+        let initialBallSpeed = 4; // 基礎速度
+        let dx = initialBallSpeed;
+        let dy = -initialBallSpeed;
+
+        // 磚塊參數定義
+        const brickRowCount = 4;    // 磚塊排數 (4排)
+        const brickColumnCount = 6; // 每排有 6 個磚塊
+        const brickWidth = 65;      // 磚塊寬度
+        const brickHeight = 16;     // 磚塊高度
+        const brickPadding = 10;    // 磚塊之間的間距
+        const brickOffsetTop = 40;  // 磚塊與頂端的距離
+        const brickOffsetLeft = 20; // 磚塊與左側的距離
+
+        let bricks = [];
+
+        // 💡 【分數控制 - 變數定義】
+        let score = 0;
+        let lives = 3;
+        let level = 1;
+        
+        let gameRunning = false;
+        let isPaused = false;
+        let animationId = null;
+
+        // 監聽鍵盤與滑鼠事件
+        let rightPressed = false;
+        let leftPressed = false;
+        document.addEventListener("keydown", keyDownHandler);
+        document.addEventListener("keyup", keyUpHandler);
+        document.addEventListener("mousemove", mouseMoveHandler);
+
+        // 格式化分數顯示（補零，例如 005）
+        function formatNumber(num) {
+            return String(num).padStart(3, '0');
+        }
+
+        // 鍵盤按下事件
+        function keyDownHandler(e) {
+            if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
+                rightPressed = true;
+            } else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
+                leftPressed = true;
+            } else if (e.key === " ") {
+                e.preventDefault(); // 防止空白鍵滾動頁面
+                togglePause();
+            }
+        }
+
+        // 鍵盤放開事件
+        function keyUpHandler(e) {
+            if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
+                rightPressed = false;
+            } else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
+                leftPressed = false;
+            }
+        }
+
+        // 滑鼠移動控制擋板
+        function mouseMoveHandler(e) {
+            const rect = canvas.getBoundingClientRect();
+            // 計算滑鼠在畫布內相對的 X 座標
+            const relativeX = e.clientX - rect.left;
+            if (relativeX > 0 && relativeX < canvas.width) {
+                // 將擋板中心對準滑鼠 X 座標
+                paddleX = relativeX - paddleWidth / 2;
+                // 限制擋板不移出邊界
+                if (paddleX < 0) paddleX = 0;
+                if (paddleX > canvas.width - paddleWidth) paddleX = canvas.width - paddleWidth;
+            }
+        }
+
+        // 初始化磚塊陣列
+        function initBricks() {
+            bricks = [];
+            for (let c = 0; c < brickColumnCount; c++) {
+                bricks[c] = [];
+                for (let r = 0; r < brickRowCount; r++) {
+                    bricks[c][r] = { x: 0, y: 0, status: 1 }; // status 1 代表磚塊未被打破
+                }
+            }
+        }
+
+        // 重置球與擋板位置
+        function resetBallAndPaddle() {
+            ballX = canvas.width / 2;
+            ballY = canvas.height - 40;
+            // 💡 【控制速度 - 球的初速度隨關卡提升】
+            // 隨著關卡 (level) 上升，基礎速度微幅增加 (每關加 0.5 像素)
+            const speed = initialBallSpeed + (level - 1) * 0.5;
+            dx = speed * (Math.random() > 0.5 ? 1 : -1); // 隨機向左或向右彈射
+            dy = -speed; // 一律向上射出
+            paddleX = (canvas.width - paddleWidth) / 2;
+        }
+
+        // 開始 / 重新開始遊戲
+        function startGame() {
+            if (!gameRunning) {
+                // 💡 【分數與生命控制 - 遊戲初始重置】
+                score = 0;
+                lives = 3;
+                level = 1;
+                scoreEl.textContent = formatNumber(score);
+                levelEl.textContent = formatNumber(level);
+                livesEl.textContent = "♥".repeat(lives);
+
+                initBricks();
+                resetBallAndPaddle();
+                
+                overlay.style.display = "none";
+                actionBtn.textContent = "暫停遊戲";
+                
+                gameRunning = true;
+                isPaused = false;
+                
+                // 啟動 JavaScript 高效動畫迴圈 requestAnimationFrame
+                if (animationId) cancelAnimationFrame(animationId);
+                animationId = requestAnimationFrame(gameLoop);
+            } else {
+                togglePause();
+            }
+            canvas.focus();
+        }
+
+        // 暫停 / 繼續遊戲
+        function togglePause() {
+            if (!gameRunning) return;
+
+            if (isPaused) {
+                // 繼續
+                animationId = requestAnimationFrame(gameLoop);
+                overlay.style.display = "none";
+                actionBtn.textContent = "暫停遊戲";
+                isPaused = false;
+            } else {
+                // 暫停
+                cancelAnimationFrame(animationId);
+                overlayTitle.textContent = "PAUSED";
+                overlaySub.textContent = "按空白鍵或下方按鈕繼續遊戲";
+                overlay.style.display = "flex";
+                actionBtn.textContent = "繼續遊戲";
+                isPaused = true;
+            }
+        }
+
+        // 遊戲結束
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            playAudio(120, 'sawtooth', 0.6); // 播放低沉墜落音效
+
+            overlayTitle.textContent = "GAME OVER";
+            overlaySub.textContent = `最終得分: ${score} 分。別氣餒，再試一次吧！`;
+            overlay.style.display = "flex";
+            actionBtn.textContent = "重新開始";
+        }
+
+        // 💡 【分數控制 - 關卡升級】
+        // 當打完畫面上所有磚塊時，重置磚塊並提升難度
+        function checkLevelUp() {
+            let allBroken = true;
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    if (bricks[c][r].status === 1) {
+                        allBroken = false;
+                        break;
+                    }
+                }
+            }
+
+            if (allBroken) {
+                level++;
+                levelEl.textContent = formatNumber(level);
+                
+                // 播放勝利和弦音效
+                playAudio(523.25, 'sine', 0.15); // C5
+                setTimeout(() => playAudio(659.25, 'sine', 0.15), 150); // E5
+                setTimeout(() => playAudio(783.99, 'sine', 0.3), 300); // G5
+
+                initBricks();
+                resetBallAndPaddle();
+            }
+        }
+
+        // 💡 【碰撞偵測 - 磚塊碰撞】
+        function collisionDetection() {
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    const b = bricks[c][r];
+                    if (b.status === 1) {
+                        // 判定球是否與磚塊的範圍重合
+                        if (ballX > b.x && ballX < b.x + brickWidth && ballY > b.y && ballY < b.y + brickHeight) {
+                            dy = -dy; // 反彈
+                            b.status = 0; // 標記磚塊已破壞
+                            
+                            // 💡 【分數控制 - 擊碎不同顏色磚塊獲得不同分數】
+                            // 越靠近上方的紅色磚塊分數越高！
+                            let pointGained = 10;
+                            if (r === 0) pointGained = 40; // 紅色 40 分
+                            else if (r === 1) pointGained = 30; // 橘色 30 分
+                            else if (r === 2) pointGained = 20; // 黃色 20 分
+                            
+                            score += pointGained;
+                            scoreEl.textContent = formatNumber(score);
+                            
+                            // 播放清脆的擊中磚塊聲
+                            playAudio(600 + r * 100, 'sine', 0.08); 
+
+                            // 檢查是否全部通關
+                            checkLevelUp();
+                        }
+                    }
+                }
+            }
+        }
+
+        // 💡 【遊戲主迴圈】
+        function gameLoop() {
+            if (!gameRunning || isPaused) return;
+
+            // 1. 清空畫布並繪製新畫面
+            draw();
+
+            // 2. 進行磚塊碰撞偵測
+            collisionDetection();
+
+            // 3. 處理彈力球與四周牆壁的彈跳碰撞
+            
+            // X 軸碰撞（左右兩側牆壁）
+            if (ballX + dx > canvas.width - ballRadius || ballX + dx < ballRadius) {
+                dx = -dx;
+                playAudio(400, 'sine', 0.05); // 撞牆音效
+            }
+            
+            // Y 軸碰撞（天花板）
+            if (ballY + dy < ballRadius) {
+                dy = -dy;
+                playAudio(400, 'sine', 0.05); // 撞天花板音效
+            } 
+            // Y 軸下落（地板方向）
+            else if (ballY + dy > canvas.height - ballRadius) {
+                
+                // 檢查是否落在擋板範圍內（成功用擋板接住球）
+                if (ballX > paddleX && ballX < paddleX + paddleWidth) {
+                    
+                    // 💡 【球擊中擋板物理學】
+                    // 根據球擊中擋板的位置，改變球的反彈 X 軸角度（擊中邊緣彈得更陡峭，擊中中心彈得較直）
+                    const collidePoint = ballX - (paddleX + paddleWidth / 2);
+                    const normalizedCollidePoint = collidePoint / (paddleWidth / 2); // 介於 -1 與 1 之間
+                    
+                    const speed = Math.sqrt(dx * dx + dy * dy);
+                    // 限制最大彈射角度
+                    dx = speed * normalizedCollidePoint * 0.8;
+                    dy = -Math.sqrt(speed * speed - dx * dx); // 保持總體速度不變並向上反彈
+                    
+                    playAudio(300, 'triangle', 0.08); // 擋板接住的復古厚實音效
+                } else {
+                    // 沒接住球，扣除生命
+                    lives--;
+                    livesEl.textContent = "♥".repeat(lives);
+                    playAudio(200, 'sawtooth', 0.25); // 扣生命警告音效
+
+                    if (lives === 0) {
+                        gameOver();
+                        return;
+                    } else {
+                        // 還有生命，重置球與擋板繼續
+                        resetBallAndPaddle();
+                    }
+                }
+            }
+
+            // 4. 移動鍵盤控制的擋板位置（如果滑鼠沒在移動，支援純鍵盤操作）
+            if (rightPressed && paddleX < canvas.width - paddleWidth) {
+                paddleX += paddleSpeed;
+            } else if (leftPressed && paddleX > 0) {
+                paddleX -= paddleSpeed;
+            }
+
+            // 5. 更新球的位置
+            ballX += dx;
+            ballY += dy;
+
+            // 6. 循環呼叫下一影格
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        // 💡 【控制顏色與畫布繪製 - 繪圖主函式】
+        function draw() {
+            // 清空畫布背景
+            ctx.fillStyle = "#05060a";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 繪製微弱網格
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.015)";
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.width; i += 30) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i < canvas.height; i += 30) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            // 繪製磚塊
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    if (bricks[c][r].status === 1) {
+                        // 計算每個磚塊在畫布上的 x, y 座標
+                        const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+                        const brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+                        bricks[c][r].x = brickX;
+                        bricks[c][r].y = brickY;
+                        
+                        // 💡 【控制顏色】讀取當前排數的霓虹色彩
+                        const brickColor = colors.bricks[r];
+                        ctx.fillStyle = brickColor;
+                        
+                        // 增加霓虹發光濾鏡
+                        ctx.shadowBlur = 6;
+                        ctx.shadowColor = brickColor;
+                        
+                        // 繪製圓角小磚塊
+                        drawRoundedRect(brickX, brickY, brickWidth, brickHeight, 4);
+                    }
+                }
+            }
+
+            // 💡 【控制顏色】繪製擋板 (Paddle)
+            ctx.fillStyle = colors.paddle;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = colors.paddle;
+            drawRoundedRect(paddleX, canvas.height - paddleHeight - 10, paddleWidth, paddleHeight, 6);
+
+            // 💡 【控制顏色】繪製彈力球 (Ball)
+            ctx.fillStyle = colors.ball;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = colors.ballGlow; // 讓白球發出霓虹藍光
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 重設陰影效果，避免影響下一次的繪圖
+            ctx.shadowBlur = 0;
+        }
+
+        // 輔助函式：繪製圓角矩形
+        function drawRoundedRect(x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // 💡 【音效控制器 - Web Audio API】
+        // 利用瀏覽器即時合成復古的 8-bit 電子遊戲音效
+        function playAudio(frequency, type, duration) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.type = type; // 'sine' 代表純淨高音，'sawtooth' 代表低沉鋸齒波，'triangle' 代表復古厚實音效
+
+                if (type === 'sawtooth') {
+                    // 扣血或結束音效：頻率迅速滑落
+                    oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + duration);
+                } else {
+                    oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+                }
+
+                // 快速淡出，避免爆音
+                gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                // 不支援音效時默默忽略
+            }
+        }
+    </script>
+</body>
+</html>
